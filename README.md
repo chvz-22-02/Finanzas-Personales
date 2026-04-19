@@ -3,7 +3,7 @@
 (Hecho con la inestimable ayuda de Claude.ai)
 
 Extrae automáticamente tus transacciones de los correos de **BCP**, **Pichincha** y **Yape**
-y las exporta a un archivo `gastos.csv` listo para analizar en Excel o Google Sheets.
+y las exporta a un archivo `contabilidad.txt` listo para analizar.
 
 ## Correos soportados
 
@@ -11,6 +11,7 @@ y las exporta a un archivo `gastos.csv` listo para analizar en Excel o Google Sh
 |---|---|---|
 | BCP | Consumo con Tarjeta de Crédito/Débito | gasto |
 | BCP | Pago de servicios (Banca Móvil) | gasto |
+| BCP | Retiro en agente | gasto |
 | BCP | Recepción de Yapeo | ingreso |
 | Yape | Yapeo enviado | gasto |
 | Pichincha | Envío a contacto | gasto |
