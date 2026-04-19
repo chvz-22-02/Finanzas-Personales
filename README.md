@@ -72,14 +72,16 @@ El token expira por inactividad, de ser el caso, eliminar `token.json` y ejecuta
 
 | Columna | Descripción | Ejemplo |
 |---|---|---|
+| `id` | Identificador interno del correo del movimiento | `19d54ce4f7e41031` |
 | `fecha` | Fecha y hora de la operación | `2026-03-04 17:49` |
-| `monto` | Monto en soles | `14.99` |
+| `monto` | Monto | `14.99` |
 | `tipo` | `gasto` o `ingreso` | `gasto` |
 | `categoria` | Tipo de transacción | `Consumo TC/TD` |
 | `descripcion` | Empresa o beneficiario | `ADM CLIN RICARDO PALMA` |
-| `banco` | Banco de origen | `BCP` |
+| `banco` | Entidad que notifica | `BCP` |
 | `cuenta` | Últimos 4 dígitos | `************1756` |
 | `num_operacion` | Número de operación | `0000383035` |
+| `moneda` | Moneda de la operación | `PEN` |
 
 ---
 
