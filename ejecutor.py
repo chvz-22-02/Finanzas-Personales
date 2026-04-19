@@ -3,7 +3,7 @@ from datetime import datetime
 import subprocess
 import os
 
-df = pd.read_pickle('data/processed/contabilidad.pickle')
+df = pd.read_csv('data/processed/contabilidad.txt', sep='|')
 df['fecha'] = pd.to_datetime(df['fecha'])
 
 fecha_max = df['fecha'].max()

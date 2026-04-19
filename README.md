@@ -47,29 +47,23 @@ Necesitas crear un proyecto en Google Cloud y habilitar la Gmail API:
 ---
 
 ## Uso
+Tiene un modo de uso de actualización secuencial, pero, para la primera ejecución, operar de la siguiente manera: 
 
-### Ejecución básica (últimos 90 días)
-```bash
-python extractor_gastos.py
-```
-
-### Últimos 30 días
+### Extracción de los correos (se puede cambiar los días a la cantidad que se deseen) y guardado
 ```bash
 python extractor_gastos.py --dias 30
+python almacenado_informacion.py
 ```
 
-### Todos los correos
+Para la actualización secuencial:
+### Actualización secuencial
 ```bash
-python extractor_gastos.py --todos
-```
-
-### Con nombre de archivo personalizado
-```bash
-python extractor_gastos.py --dias 60 --salida febrero_marzo.csv
+python ejecutor.py
 ```
 
 **Primera ejecución:** se abrirá el navegador para que autorices el acceso.
-Tras aceptar, se guarda `token.json` y no vuelves a necesitar autorizarlo.
+Tras aceptar, se guarda `token.json` y no vuelves a necesitar autorizarlo a no ser que expire.
+El token expira por inactividad, de ser el caso, eliminar `token.json` y ejecutar normalmente, simplemente se volverá a abrir en el navegador la autorización de acceso.
 
 ---
 
@@ -91,7 +85,8 @@ Tras aceptar, se guarda `token.json` y no vuelves a necesitar autorizarlo.
 ## Archivos generados
 
 - `token.json` — Token de acceso a Gmail (no compartir)
-- `gastos.csv` — Resultado de la extracción
+- `gastosyyyy-mm-dd_hh-mm-ss.csv` — Resultado de la última extracción
+- `contabilidad.txt` — Consolidado de todas las extracciones
 
 ---
 
@@ -101,3 +96,12 @@ En `extractor_gastos.py`:
 1. Agrega el remitente a la lista `SENDERS`
 2. Crea una función `parse_nuevo_banco(html, text)`
 3. Agrega la condición en la función `classify_and_parse()`
+
+---
+
+## Consideraciones finales
+
+Debido a que solo soy cliente del BCP y el Pichincha, solo he tenido los correos de dichos bancos para poder hacer la función de parseo. Si quisieras colaborar para que el proyecto soporte, ¡Bienvenido sea! Asimismo, tiene un pequeño vacío en el registro de los movimientos que son los yapeos recibidos desde otro yape y los depósitos realizados mediante un agente BCP. Debido a que estas operaciones no son notificadas por correo, no se van a poder ver incluidas en el alcance de este proyecto.
+
+Me gustaría añadir una solución amigable para el registro y edición manual de movimientos, pero, debido a que con lo realizado hasta el momento ya soluciono en buena medida la necesidad puntual de controlar mis finanzas, no es actualmente una prioridad.
+

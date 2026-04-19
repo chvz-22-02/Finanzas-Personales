@@ -12,13 +12,18 @@ for archivo in archivos_csv:
     dataframes.append(df)
 df_final = pd.concat(dataframes, ignore_index=True)
 
-df_historico = pd.read_pickle('data/processed/contabilidad.pickle')
+try:
+    # df_historico = pd.read_pickle('data/processed/contabilidad.pickle')
+    df_historico = pd.read_csv('data/processed/contabilidad.txt', sep='|')
 
-df_update = df_final[~df_final['id'].isin(df_historico['id'])]
+    df_update = df_final[~df_final['id'].isin(df_historico['id'])]
 
-df_actualizado = pd.concat([df_historico, df_update])
+    df_actualizado = pd.concat([df_historico, df_update])
 
-df_actualizado.to_pickle('data/processed/contabilidad.pickle')
+    # df_actualizado.to_pickle('data/processed/contabilidad.pickle')
+    df_actualizado.to_csv('data/processed/contabilidad.txt', sep='|', index=False)
+except:
+    df_final.to_csv('data/processed/contabilidad.txt', sep='|', index=False)
 
 os.makedirs(carpeta_destino, exist_ok=True)
 for archivo in archivos_csv:

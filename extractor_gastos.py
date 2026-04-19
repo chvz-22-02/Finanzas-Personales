@@ -52,7 +52,7 @@ SENDERS = [
 FIELDNAMES = [
     'id', 'fecha', 'monto', 'tipo',        # gasto / ingreso
     'categoria', 'descripcion',
-    'banco', 'cuenta', 'num_operacion',
+    'banco', 'cuenta', 'num_operacion', 'moneda'
 ]
 
 
@@ -176,7 +176,7 @@ def parse_amount(s):
 def parse_date(s):
     """
     Parsea fechas en los múltiples formatos que usan BCP, Pichincha y Yape.
-
+ 
     Formatos soportados:
       "04 de marzo de 2026 - 05:49 PM"
       "22 de febrero de 2026 - 09:25 AM"
@@ -188,19 +188,19 @@ def parse_date(s):
     if not s:
         return None
     s = s.strip()
-
+ 
     # DD/MM/YYYY HH:MM
     m = re.search(r'(\d{2})/(\d{2})/(\d{4})\s+(\d{2}):(\d{2})', s)
     if m:
         return datetime(int(m.group(3)), int(m.group(2)), int(m.group(1)),
                         int(m.group(4)), int(m.group(5)))
-
+ 
     # Normalizar "P. M." → "PM", "p. m." → "PM"
     s = re.sub(r'[Pp]\.\s*[Mm]\.', 'PM', s)
     s = re.sub(r'[Aa]\.\s*[Mm]\.', 'AM', s)
     # Quitar día de semana inicial ("Viernes, ")
     s = re.sub(r'^[A-Za-záéíóúÁÉÍÓÚ]+,\s*', '', s)
-
+ 
     # DD [de] MES [de] YYYY [- HH:MM [AM|PM]]
     pattern = (
         r'(\d{1,2})\s+(?:de\s+)?([A-Za-záéíóúÁÉÍÓÚ]+)\s+(?:de\s+)?(\d{4})'
@@ -216,10 +216,13 @@ def parse_date(s):
         hour  = int(m.group(4)) if m.group(4) else 0
         minute= int(m.group(5)) if m.group(5) else 0
         ampm  = (m.group(6) or '').upper()
-        if ampm == 'PM' and hour != 12:
-            hour += 12
-        elif ampm == 'AM' and hour == 12:
-            hour = 0
+        # Si la hora ya es >= 13 está en formato 24h: ignorar AM/PM aunque esté presente
+        # (caso "18:29 PM" — el banco envía el sufijo por error)
+        if hour < 13:
+            if ampm == 'PM' and hour != 12:
+                hour += 12
+            elif ampm == 'AM' and hour == 12:
+                hour = 0
         try:
             return datetime(year, month, day, hour, minute)
         except ValueError:
@@ -284,12 +287,59 @@ def parse_bcp_consumo_tc(html, text, id):
     cuenta        = first_match([r'(\*{4,}\d{4})'], text) or ''
     num_operacion = tbl.get('Número de operación') \
                  or first_match([r'Número de operación\s+(\d+)'], text) or ''
+    
+    if first_match([r'Realizaste un consumo de <b>([^ ]+)'], html)=='S/': 
+        moneda = 'PEN' 
+    else: 
+        moneda = 'USD'
 
     return {
         'id': id,
         'banco': 'BCP', 'tipo': 'gasto', 'categoria': 'Consumo TC',
         'monto': monto, 'descripcion': descripcion.strip(),
-        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': num_operacion,
+        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': num_operacion, 'moneda': moneda
+    }
+
+
+def parse_bcp_consumo_td(html, text, id):
+    """
+    BCP – Consumo con Tarjeta de Crédito/Débito
+    Asunto: "Realizaste un consumo con tu Tarjeta de Débito BCP"
+    """
+    soup = BeautifulSoup(html, 'html.parser')
+    tbl  = html_table_to_dict(soup)
+
+    # Monto: primero desde el párrafo principal
+    monto_str = first_match([
+        r'consumo de\s+(S/\.?\s*[\d.,]+)',
+        r'Total del consumo\s+(S/\.?\s*[\d.,]+)',
+    ], text)
+    monto = parse_amount(monto_str) or parse_amount(tbl.get('Total del consumo', ''))
+
+    # Empresa
+    descripcion = first_match([r'BCP en\s+([^\.\n]+?)\.'], text) \
+               or tbl.get('Empresa', '')
+
+    # Fecha
+    fecha_str = tbl.get('Fecha y hora') \
+             or first_match([r'Fecha y hora\s+(.+?)(?:Número|Empresa|$)'], text)
+    fecha = parse_date(fecha_str)
+
+    # Tarjeta y operación
+    cuenta        = first_match([r'(\*{4,}\d{4})'], text) or ''
+    num_operacion = tbl.get('Número de operación') \
+                 or first_match([r'Número de operación\s+(\d+)'], text) or ''
+    
+    if first_match([r'Realizaste un consumo de <b>([^ ]+)'], html)=='S/': 
+        moneda = 'PEN' 
+    else: 
+        moneda = 'USD'
+
+    return {
+        'id': id,
+        'banco': 'BCP', 'tipo': 'gasto', 'categoria': 'Consumo TD',
+        'monto': monto, 'descripcion': descripcion.strip(),
+        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': num_operacion, 'moneda': moneda
     }
 
 
@@ -315,7 +365,7 @@ def parse_bcp_pago_servicio(html, text, id):
         'id': id,
         'banco': 'BCP', 'tipo': 'gasto', 'categoria': 'Pago de servicio',
         'monto': monto, 'descripcion': (empresa or '').strip(),
-        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': num_op,
+        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': num_op, 'moneda': 'PEN'
     }
 
 
@@ -338,7 +388,7 @@ def parse_bcp_yapeo_recibido(html, text, id):
         'id': id,
         'banco': 'BCP', 'tipo': 'ingreso', 'categoria': 'Yapeo recibido',
         'monto': monto, 'descripcion': enviado.strip(),
-        'fecha': fecha, 'cuenta': '', 'num_operacion': '',
+        'fecha': fecha, 'cuenta': '', 'num_operacion': '', 'moneda': 'PEN'
     }
 
 
@@ -364,7 +414,7 @@ def parse_yape_yapeo_enviado(html, text, id):
         'id': id,
         'banco': 'Yape', 'tipo': 'gasto', 'categoria': 'Yapeo',
         'monto': monto, 'descripcion': f'Yapeo a: {beneficiario.strip()}',
-        'fecha': fecha, 'cuenta': 'Yape', 'num_operacion': num_op,
+        'fecha': fecha, 'cuenta': 'Yape', 'num_operacion': num_op, 'moneda': 'PEN'
     }
 
 
@@ -407,7 +457,7 @@ def parse_pichincha_envio(html, text, id):
         'id': id,
         'banco': 'Pichincha', 'tipo': 'gasto', 'categoria': 'Transferencia',
         'monto': monto, 'descripcion': destino,
-        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': num_op,
+        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': num_op, 'moneda': 'PEN'
     }
 
 
@@ -428,7 +478,7 @@ def parse_pichincha_recibido(html, text, id):
         'id': id,
         'banco': 'Pichincha', 'tipo': 'ingreso', 'categoria': 'Pago recibido',
         'monto': monto, 'descripcion': remitente.strip(),
-        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': '',
+        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': '', 'moneda': 'PEN'
     }
 
 
@@ -449,7 +499,7 @@ def parse_bcp_retiro_agente(html, text, id):
 
     # Fecha
     fecha_str = tbl.get('Fecha y hora') \
-             or first_match([r'Fecha y hora\s+(.+?)(?:Número|Cuenta|Canal|$)'], text)
+             or first_match([r'Fecha y hora\s+(.+?)(?:Número|Empresa|$)'], text)
     fecha = parse_date(fecha_str)
 
     # Tarjeta de débito y cuenta de cargo
@@ -470,7 +520,7 @@ def parse_bcp_retiro_agente(html, text, id):
         'id': id,
         'banco': 'BCP', 'tipo': 'gasto', 'categoria': 'Retiro',
         'monto': monto, 'descripcion': descripcion,
-        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': num_operacion,
+        'fecha': fecha, 'cuenta': cuenta, 'num_operacion': num_operacion, 'moneda': 'PEN'
     }
 
 
@@ -485,8 +535,10 @@ def classify_and_parse(msg, id):
 
     # ── BCP ──────────────────────────────────────────────
     if 'notificacionesbcp' in sender:
-        if 'consumo' in subj_l:
+        if 'tarjeta de crédito bcp' in subj_l:
             return parse_bcp_consumo_tc(html, text, id)
+        if 'tarjeta de débito bcp' in subj_l:
+            return parse_bcp_consumo_td(html, text, id)
         if 'pago de servicio' in subj_l:
             return parse_bcp_pago_servicio(html, text, id)
         if 'yapeo' in subj_l and ('recep' in subj_l or 'recib' in subj_l):
@@ -579,7 +631,8 @@ def main():
             print(
                 f"  [{i:>3}/{len(messages)}] ✓ "
                 f"{'INGRESO' if result['tipo']=='ingreso' else 'GASTO  '} "
-                f"S/ {result['monto']:>8.2f}  "
+                f"{result['monto']:>8.2f}  "
+                f"{result['moneda']}  "
                 f"{result['banco']:<10} "
                 f"{fecha_str}  "
                 f"{result.get('descripcion','')[:30]}"

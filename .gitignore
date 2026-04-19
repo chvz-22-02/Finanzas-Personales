@@ -9,3 +9,6 @@ notebook.ipynb
 
 # data
 data/
+
+# dashboard
+*.pbix
